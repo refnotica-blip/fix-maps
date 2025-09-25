@@ -37,6 +37,7 @@ const CreateReportScreen = ({ navigation }) => {
       lat: location.latitude,
       lng: location.longitude,
       address: location.address,
+      ward: location.ward,
     });
   };
 
@@ -152,6 +153,7 @@ const CreateReportScreen = ({ navigation }) => {
         lat: locationData.lat,
         lng: locationData.lng,
         address: locationData.address,
+        ward_id: locationData.ward?.id || null,
         photo_url: formData.photo_url || undefined,
       };
 

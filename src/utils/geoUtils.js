@@ -1,6 +1,113 @@
 import simplify from 'simplify-geojson';
 
 /**
+ * Checks if a point is inside a polygon using ray casting algorithm
+ * @param {Object} point - {latitude, longitude}
+ * @param {Array} polygon - Array of [longitude, latitude] coordinates
+ * @returns {boolean}
+ */
+export const isPointInPolygon = (point, polygon) => {
+  const { latitude: lat, longitude: lng } = point;
+  let inside = false;
+  
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    
+    if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  
+  return inside;
+};
+
+/**
+ * Finds which ward a point belongs to
+ * @param {Object} point - {latitude, longitude}
+ * @param {Object} geoJsonData - GeoJSON data with ward polygons
+ * @returns {Object|null} Ward feature or null if not found
+ */
+export const findWardForPoint = (point, geoJsonData) => {
+  if (!geoJsonData?.features || !point) return null;
+  
+  for (const feature of geoJsonData.features) {
+    if (feature.geometry?.type === 'Polygon') {
+      const coordinates = feature.geometry.coordinates[0];
+      if (isPointInPolygon(point, coordinates)) {
+        return feature;
+      }
+    } else if (feature.geometry?.type === 'MultiPolygon') {
+      for (const polygon of feature.geometry.coordinates) {
+        const coordinates = polygon[0];
+        if (isPointInPolygon(point, coordinates)) {
+          return feature;
+        }
+      }
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Renders GeoJSON polygons as React Native Maps Polygon components
+ * @param {Object} geoJsonData - GeoJSON data
+ * @param {Object} options - Rendering options
+ * @returns {Array} Array of Polygon components
+ */
+export const renderGeoJSONPolygons = (geoJsonData, options = {}) => {
+  if (!geoJsonData?.features) return [];
+  
+  const {
+    strokeColor = '#2196F3',
+    fillColor = 'rgba(33, 150, 243, 0.1)',
+    strokeWidth = 1,
+    onPress = null,
+  } = options;
+  
+  const polygons = [];
+  
+  geoJsonData.features.forEach((feature, index) => {
+    if (feature.geometry?.type === 'Polygon') {
+      const coordinates = feature.geometry.coordinates[0].map(coord => ({
+        latitude: coord[1],
+        longitude: coord[0],
+      }));
+      
+      polygons.push({
+        id: feature.properties?.id || `polygon-${index}`,
+        coordinates,
+        strokeColor,
+        fillColor,
+        strokeWidth,
+        feature,
+        onPress: onPress ? () => onPress(feature) : undefined,
+      });
+    } else if (feature.geometry?.type === 'MultiPolygon') {
+      feature.geometry.coordinates.forEach((polygon, polyIndex) => {
+        const coordinates = polygon[0].map(coord => ({
+          latitude: coord[1],
+          longitude: coord[0],
+        }));
+        
+        polygons.push({
+          id: feature.properties?.id || `multipolygon-${index}-${polyIndex}`,
+          coordinates,
+          strokeColor,
+          fillColor,
+          strokeWidth,
+          feature,
+          onPress: onPress ? () => onPress(feature) : undefined,
+        });
+      });
+    }
+  });
+  
+  return polygons;
+};
+
+/**
  * Simplifies GeoJSON polygons to reduce rendering complexity
  * @param {Object} geojson - The GeoJSON object
  * @param {number} tolerance - Simplification tolerance (higher = more simplified)

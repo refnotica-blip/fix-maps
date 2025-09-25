@@ -52,6 +52,7 @@ const SignupScreen = ({ navigation }) => {
       homeAddress: location.address,
       lat: location.latitude,
       lng: location.longitude,
+      ward_id: location.ward?.id || null,
     }));
   };
 
@@ -111,6 +112,7 @@ const SignupScreen = ({ navigation }) => {
         home_address: formData.homeAddress.trim() || undefined,
         lat: formData.lat,
         lng: formData.lng,
+        ward_id: formData.ward_id,
       };
 
       await signUp(userData);

@@ -1,10 +1,9 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-import Geojson from 'react-native-maps-geojson';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import { theme } from '../../config/theme';
 import { useGeoJSON } from '../../hooks/useGeoJSON';
-import { debounce } from '../../utils/geoUtils';
+import { debounce, renderGeoJSONPolygons } from '../../utils/geoUtils';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
 
@@ -21,6 +20,7 @@ const OptimizedMapView = ({
   onMarkerPress,
   onMapPress,
   showWards = true,
+  onWardPress,
   style,
   children,
   ...mapProps
@@ -61,21 +61,30 @@ const OptimizedMapView = ({
     debouncedRegionChange(region);
   }, [debouncedRegionChange]);
 
-  // Memoized ward polygons with performance optimizations
+  // Memoized ward polygons using native Polygon components
   const wardPolygons = useMemo(() => {
     if (!showWards || !geoJsonData || loading) return null;
 
-    return (
-      <Geojson
-        geojson={geoJsonData}
-        strokeColor={theme.colors.primary}
-        fillColor="rgba(33, 150, 243, 0.1)"
-        strokeWidth={1}
-        onPress={(feature) => {
-          console.log('Ward selected:', feature.properties);
-        }}
+    const polygons = renderGeoJSONPolygons(geoJsonData, {
+      strokeColor: theme.colors.primary,
+      fillColor: 'rgba(33, 150, 243, 0.1)',
+      strokeWidth: 1,
+      onPress: onWardPress || ((feature) => {
+        console.log('Ward selected:', feature.properties);
+      }),
+    });
+
+    return polygons.map((polygon) => (
+      <Polygon
+        key={polygon.id}
+        coordinates={polygon.coordinates}
+        strokeColor={polygon.strokeColor}
+        fillColor={polygon.fillColor}
+        strokeWidth={polygon.strokeWidth}
+        onPress={polygon.onPress}
+        tappable={!!polygon.onPress}
       />
-    );
+    ));
   }, [geoJsonData, showWards, loading]);
 
   // Memoized markers for performance

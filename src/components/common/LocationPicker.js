@@ -14,6 +14,7 @@ import Button from './Button';
 import LoadingSpinner from './LoadingSpinner';
 import { theme } from '../../config/theme';
 import { useLocation } from '../../hooks/useLocation';
+import { useWards } from '../../hooks/useWards';
 import { debounce } from '../../utils/geoUtils';
 
 const { width, height } = Dimensions.get('window');
@@ -37,8 +38,10 @@ const LocationPicker = ({
   const [loading, setLoading] = useState(false);
   const [showMapView, setShowMapView] = useState(showMap);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [selectedWard, setSelectedWard] = useState(null);
 
   const { getCurrentLocation, reverseGeocode } = useLocation();
+  const { findWardByLocation } = useWards();
 
   // Initialize with provided location
   useEffect(() => {
@@ -112,16 +115,22 @@ const LocationPicker = ({
     const newLocation = { latitude, longitude };
     
     setSelectedLocation(newLocation);
+    
+    // Find ward for the selected location
+    const ward = findWardByLocation(latitude, longitude);
+    setSelectedWard(ward);
+    
     debouncedReverseGeocode(newLocation);
 
     // Notify parent component
     if (onLocationChange) {
       onLocationChange({
         ...newLocation,
+        ward,
         address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
       });
     }
-  }, [address, onLocationChange, debouncedReverseGeocode]);
+  }, [address, onLocationChange, debouncedReverseGeocode, findWardByLocation]);
 
   const handleAddressChange = (text) => {
     setAddress(text);
@@ -143,6 +152,21 @@ const LocationPicker = ({
     }
   };
 
+  // Update ward when location changes
+  useEffect(() => {
+    if (selectedLocation) {
+      const ward = findWardByLocation(selectedLocation.latitude, selectedLocation.longitude);
+      setSelectedWard(ward);
+      
+      if (onLocationChange) {
+        onLocationChange({
+          ...selectedLocation,
+          ward,
+          address,
+        });
+      }
+    }
+  }, [selectedLocation, findWardByLocation, address, onLocationChange]);
   const toggleMapView = () => {
     setShowMapView(!showMapView);
   };
@@ -231,9 +255,16 @@ const LocationPicker = ({
         />
         
         {selectedLocation && (
-          <Text style={styles.coordinates}>
-            {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
-          </Text>
+          <View style={styles.locationInfo}>
+            <Text style={styles.coordinates}>
+              {selectedLocation.latitude.toFixed(6)}, {selectedLocation.longitude.toFixed(6)}
+            </Text>
+            {selectedWard && (
+              <Text style={styles.wardInfo}>
+                {selectedWard.name} • {selectedWard.municipality}
+              </Text>
+            )}
+          </View>
         )}
       </View>
 
@@ -320,6 +351,15 @@ const styles = StyleSheet.create({
     fontSize: theme.fonts.sizes.xs,
     color: theme.colors.textSecondary,
     fontFamily: 'monospace',
+  },
+  locationInfo: {
+    alignItems: 'flex-end',
+  },
+  wardInfo: {
+    fontSize: theme.fonts.sizes.xs,
+    color: theme.colors.primary,
+    fontWeight: theme.fonts.weights.medium,
+    marginTop: theme.spacing.xs / 2,
   },
   suggestions: {
     marginTop: theme.spacing.sm,

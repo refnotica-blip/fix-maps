@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Asset } from 'expo-asset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { simplifyGeoJSON, filterGeoJSONByBounds } from '../utils/geoUtils';
 
 const GEOJSON_CACHE_KEY = 'cached_wards_geojson';
 const CACHE_EXPIRY_HOURS = 24;
+const GEOJSON_URL = 'https://raw.githubusercontent.com/Thabang-777/wards-geojson/main/wards.geojson';
 
 export const useGeoJSON = (mapBounds = null, simplificationTolerance = 0.001) => {
   const [geoJsonData, setGeoJsonData] = useState(null);
@@ -29,11 +29,13 @@ export const useGeoJSON = (mapBounds = null, simplificationTolerance = 0.001) =>
         return;
       }
 
-      // Load from asset
-      const asset = Asset.fromModule(require('../../assets/wards.geojson'));
-      await asset.downloadAsync();
+      // Load from remote URL
+      const response = await fetch(GEOJSON_URL);
       
-      const response = await fetch(asset.localUri || asset.uri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
+      }
+      
       const rawGeoJSON = await response.json();
 
       // Simplify the GeoJSON to improve performance

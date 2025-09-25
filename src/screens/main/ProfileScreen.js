@@ -65,6 +65,7 @@ const ProfileScreen = ({ navigation }) => {
       home_address: location.address,
       lat: location.latitude,
       lng: location.longitude,
+      ward_id: location.ward?.id || null,
     }));
   };
 
@@ -84,6 +85,9 @@ const ProfileScreen = ({ navigation }) => {
       }
       if (formData.lng !== profile.lng) {
         updates.lng = formData.lng;
+      }
+      if (formData.ward_id !== profile.ward_id) {
+        updates.ward_id = formData.ward_id;
       }
 
       if (Object.keys(updates).length === 0) {
@@ -242,6 +246,14 @@ const ProfileScreen = ({ navigation }) => {
                 </Text>
               </View>
 
+              {profile?.ward_id && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Ward</Text>
+                  <Text style={styles.infoValue}>
+                    {profile.ward_id}
+                  </Text>
+                </View>
+              )}
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Member Since</Text>
                 <Text style={styles.infoValue}>

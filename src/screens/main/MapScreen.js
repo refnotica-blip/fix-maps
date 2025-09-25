@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import OptimizedMapView from '../../components/maps/OptimizedMapView';
 import { useLocation } from '../../hooks/useLocation';
+import { useWards } from '../../hooks/useWards';
 import municipalityService from '../../services/municipalityService';
 import reportService from '../../services/reportService';
 import { REPORT_CATEGORIES } from '../../config/api';
@@ -26,6 +27,7 @@ const MapScreen = ({ navigation }) => {
     longitudeDelta: 0.5,
   });
   const { getCurrentLocation } = useLocation();
+  const { findWardByLocation } = useWards();
 
   useEffect(() => {
     loadMapData();
@@ -89,6 +91,11 @@ const MapScreen = ({ navigation }) => {
     handleReportPress(marker.data);
   };
 
+  const handleWardPress = (wardFeature) => {
+    console.log('Ward pressed:', wardFeature.properties);
+    // You can add ward-specific functionality here
+    // For example, filter reports by ward, show ward info, etc.
+  };
   return (
     <SafeAreaView style={styles.container}>
       <OptimizedMapView
@@ -97,6 +104,7 @@ const MapScreen = ({ navigation }) => {
         markers={reportMarkers}
         onMarkerPress={handleMarkerPress}
         showWards={true}
+        onWardPress={handleWardPress}
       />
 
       <View style={styles.legend}>
