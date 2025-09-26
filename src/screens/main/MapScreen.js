@@ -10,9 +10,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import OptimizedMapView from '../../components/maps/OptimizedMapView';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import ErrorMessage from '../../components/common/ErrorMessage';
 import { useLocation } from '../../hooks/useLocation';
 import { useWards } from '../../hooks/useWards';
-import municipalityService from '../../services/municipalityService';
 import reportService from '../../services/reportService';
 import { REPORT_CATEGORIES } from '../../config/api';
 
@@ -55,6 +56,7 @@ const MapScreen = ({ navigation }) => {
         console.log('Could not get current location:', locationError.message);
       }
     } catch (err) {
+      console.error('Error loading map data:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -96,6 +98,21 @@ const MapScreen = ({ navigation }) => {
     // You can add ward-specific functionality here
     // For example, filter reports by ward, show ward info, etc.
   };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading map data..." />;
+  }
+
+  if (error) {
+    return (
+      <ErrorMessage 
+        message={error} 
+        onRetry={loadMapData}
+        retryText="Retry"
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <OptimizedMapView

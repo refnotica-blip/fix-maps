@@ -39,6 +39,7 @@ const LocationPicker = ({
   const [showMapView, setShowMapView] = useState(showMap);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [selectedWard, setSelectedWard] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const { getCurrentLocation, reverseGeocode } = useLocation();
   const { findWardByLocation } = useWards();
@@ -59,7 +60,7 @@ const LocationPicker = ({
 
   // Debounced reverse geocoding
   const debouncedReverseGeocode = useMemo(
-    () => debounce(reverseGeocodeLocation, 500),
+    () => debounce(reverseGeocodeLocation, 1000),
     []
   );
 
@@ -69,6 +70,7 @@ const LocationPicker = ({
       setAddress(addressText);
     } catch (error) {
       console.warn('Reverse geocoding failed:', error);
+      setAddress(`${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
     }
   };
 
@@ -92,10 +94,15 @@ const LocationPicker = ({
       // Get address for current location
       await reverseGeocodeLocation(newLocation);
 
+      // Find ward for the location
+      const ward = findWardByLocation(location.latitude, location.longitude);
+      setSelectedWard(ward);
+
       // Notify parent component
       if (onLocationChange) {
         onLocationChange({
           ...newLocation,
+          ward,
           address: address || 'Current location',
         });
       }
@@ -111,26 +118,32 @@ const LocationPicker = ({
   };
 
   const handleMapPress = useCallback((event) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    const newLocation = { latitude, longitude };
+    if (!mapReady) return;
     
-    setSelectedLocation(newLocation);
-    
-    // Find ward for the selected location
-    const ward = findWardByLocation(latitude, longitude);
-    setSelectedWard(ward);
-    
-    debouncedReverseGeocode(newLocation);
+    try {
+      const { latitude, longitude } = event.nativeEvent.coordinate;
+      const newLocation = { latitude, longitude };
+      
+      setSelectedLocation(newLocation);
+      
+      // Find ward for the selected location
+      const ward = findWardByLocation(latitude, longitude);
+      setSelectedWard(ward);
+      
+      debouncedReverseGeocode(newLocation);
 
-    // Notify parent component
-    if (onLocationChange) {
-      onLocationChange({
-        ...newLocation,
-        ward,
-        address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-      });
+      // Notify parent component
+      if (onLocationChange) {
+        onLocationChange({
+          ...newLocation,
+          ward,
+          address: address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+        });
+      }
+    } catch (error) {
+      console.warn('Error handling map press:', error);
     }
-  }, [address, onLocationChange, debouncedReverseGeocode, findWardByLocation]);
+  }, [address, onLocationChange, debouncedReverseGeocode, findWardByLocation, mapReady]);
 
   const handleAddressChange = (text) => {
     setAddress(text);
@@ -140,6 +153,7 @@ const LocationPicker = ({
     if (selectedLocation && onLocationChange) {
       onLocationChange({
         ...selectedLocation,
+        ward: selectedWard,
         address: text,
       });
     }
@@ -151,6 +165,10 @@ const LocationPicker = ({
       console.log('Autocomplete search for:', text);
     }
   };
+
+  const handleMapReady = useCallback(() => {
+    setMapReady(true);
+  }, []);
 
   // Update ward when location changes
   useEffect(() => {
@@ -167,6 +185,7 @@ const LocationPicker = ({
       }
     }
   }, [selectedLocation, findWardByLocation, address, onLocationChange]);
+
   const toggleMapView = () => {
     setShowMapView(!showMapView);
   };
@@ -181,13 +200,16 @@ const LocationPicker = ({
           region={mapRegion}
           onPress={handleMapPress}
           onRegionChangeComplete={setMapRegion}
+          onMapReady={handleMapReady}
           showsUserLocation={true}
           showsMyLocationButton={false}
           loadingEnabled={true}
           loadingIndicatorColor={theme.colors.primary}
           mapType="standard"
+          pitchEnabled={false}
+          rotateEnabled={false}
         >
-          {selectedLocation && (
+          {selectedLocation && mapReady && (
             <Marker
               coordinate={selectedLocation}
               title="Selected Location"

@@ -27,12 +27,13 @@ const OptimizedMapView = ({
 }) => {
   const [mapBounds, setMapBounds] = useState(null);
   const [currentRegion, setCurrentRegion] = useState(initialRegion);
+  const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef(null);
 
   // Load GeoJSON with bounds filtering for performance
   const { geoJsonData, loading, error, refreshGeoJSON } = useGeoJSON(
     mapBounds,
-    0.002 // Simplification tolerance - adjust based on performance needs
+    0.005 // Higher simplification tolerance for better performance
   );
 
   // Debounced region change handler to avoid excessive API calls
@@ -53,58 +54,79 @@ const OptimizedMapView = ({
       };
       
       setMapBounds(bounds);
-    }, 300),
+    }, 500),
     []
   );
 
   const handleRegionChangeComplete = useCallback((region) => {
-    debouncedRegionChange(region);
-  }, [debouncedRegionChange]);
+    if (mapReady) {
+      debouncedRegionChange(region);
+    }
+  }, [debouncedRegionChange, mapReady]);
+
+  const handleMapReady = useCallback(() => {
+    console.log('Map is ready');
+    setMapReady(true);
+  }, []);
 
   // Memoized ward polygons using native Polygon components
   const wardPolygons = useMemo(() => {
-    if (!showWards || !geoJsonData || loading) return null;
+    if (!showWards || !geoJsonData || loading || !mapReady) return null;
 
-    const polygons = renderGeoJSONPolygons(geoJsonData, {
-      strokeColor: theme.colors.primary,
-      fillColor: 'rgba(33, 150, 243, 0.1)',
-      strokeWidth: 1,
-      onPress: onWardPress || ((feature) => {
-        console.log('Ward selected:', feature.properties);
-      }),
-    });
+    try {
+      const polygons = renderGeoJSONPolygons(geoJsonData, {
+        strokeColor: theme.colors.primary,
+        fillColor: 'rgba(33, 150, 243, 0.1)',
+        strokeWidth: 1,
+        onPress: onWardPress || ((feature) => {
+          console.log('Ward selected:', feature.properties);
+        }),
+      });
 
-    return polygons.map((polygon) => (
-      <Polygon
-        key={polygon.id}
-        coordinates={polygon.coordinates}
-        strokeColor={polygon.strokeColor}
-        fillColor={polygon.fillColor}
-        strokeWidth={polygon.strokeWidth}
-        onPress={polygon.onPress}
-        tappable={!!polygon.onPress}
-      />
-    ));
-  }, [geoJsonData, showWards, loading]);
+      // Limit the number of polygons rendered at once for performance
+      const maxPolygons = 50;
+      const limitedPolygons = polygons.slice(0, maxPolygons);
+
+      return limitedPolygons.map((polygon) => (
+        <Polygon
+          key={polygon.id}
+          coordinates={polygon.coordinates}
+          strokeColor={polygon.strokeColor}
+          fillColor={polygon.fillColor}
+          strokeWidth={polygon.strokeWidth}
+          onPress={polygon.onPress}
+          tappable={!!polygon.onPress}
+        />
+      ));
+    } catch (polygonError) {
+      console.warn('Error rendering ward polygons:', polygonError);
+      return null;
+    }
+  }, [geoJsonData, showWards, loading, mapReady, onWardPress]);
 
   // Memoized markers for performance
   const renderedMarkers = useMemo(() => {
-    return markers.map((marker, index) => (
-      <Marker
-        key={marker.id || index}
-        coordinate={{
-          latitude: marker.latitude,
-          longitude: marker.longitude,
-        }}
-        title={marker.title}
-        description={marker.description}
-        pinColor={marker.color || theme.colors.primary}
-        onPress={() => onMarkerPress && onMarkerPress(marker)}
-      />
-    ));
+    try {
+      return markers.map((marker, index) => (
+        <Marker
+          key={marker.id || index}
+          coordinate={{
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+          }}
+          title={marker.title}
+          description={marker.description}
+          pinColor={marker.color || theme.colors.primary}
+          onPress={() => onMarkerPress && onMarkerPress(marker)}
+        />
+      ));
+    } catch (markerError) {
+      console.warn('Error rendering markers:', markerError);
+      return [];
+    }
   }, [markers, onMarkerPress]);
 
-  if (error) {
+  if (error && !geoJsonData) {
     return (
       <View style={[styles.container, style]}>
         <ErrorMessage
@@ -123,6 +145,7 @@ const OptimizedMapView = ({
         style={styles.map}
         initialRegion={initialRegion}
         onRegionChangeComplete={handleRegionChangeComplete}
+        onMapReady={handleMapReady}
         onPress={onMapPress}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -131,14 +154,15 @@ const OptimizedMapView = ({
         mapType="standard"
         pitchEnabled={false} // Disable 3D for better performance
         rotateEnabled={false} // Disable rotation for better performance
+        maxZoomLevel={18} // Limit zoom for performance
         {...mapProps}
       >
-        {wardPolygons}
-        {renderedMarkers}
+        {mapReady && wardPolygons}
+        {mapReady && renderedMarkers}
         {children}
       </MapView>
 
-      {loading && (
+      {(loading && !mapReady) && (
         <View style={styles.loadingOverlay}>
           <LoadingSpinner message="Loading map data..." />
         </View>
